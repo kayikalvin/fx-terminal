@@ -170,3 +170,37 @@ Rather than overwhelming you with thousands of lines at once, we'll develop it i
 8. **Chapter 8:** Advanced models, explainability, and model management.
 
 This approach will give you a maintainable, professional ML subsystem rather than just a script that trains a model.
+
+
+
+# FX Research Terminal ML
+
+This project trains statistical models for the FX Research Terminal.
+
+Training happens entirely offline.
+
+The browser performs only inference.
+
+Workflow
+
+CSV
+
+↓
+
+Preprocessing
+
+↓
+
+Training
+
+↓
+
+Evaluation
+
+↓
+
+Export model.json
+
+↓
+
+React Application
