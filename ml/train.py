@@ -1,10 +1,16 @@
-from src.config import FEATURE_COLUMNS
+from src.data_loader import DataLoader
+
+DATASET = "data/raw/eurusd_sample.csv"
+
 
 def main():
-    print("FX Research Terminal ML")
-    print("Features:")
-    for feature in FEATURE_COLUMNS:
-        print(f"- {feature}")
+
+    loader = DataLoader(DATASET)
+
+    df = loader.load()
+
+    loader.summary(df)
+
 
 if __name__ == "__main__":
     main()
