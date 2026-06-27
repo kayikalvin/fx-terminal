@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { computeRSI, computeSMA, computeATR } from '../services/indicators';
-import { fetchTwelveData } from '../services/twelveData';
+import { fetchHistoricalOHLC } from '../services/dataProviders';
 import { connectFinnhubStream } from '../services/finnhubStream';
 
 const AppContext = createContext();
@@ -30,48 +30,21 @@ export const AppProvider = ({ children }) => {
 
   const safeid = (pair) => pair.replace('/', '-');
 
-  const getHistoryProvider = () => {
-    if (provider === 'finnhub') {
-      if (appSettings.keys.twelve) return 'twelve';
-      if (appSettings.keys.av) return 'av';
-      return null;
-    }
-    return provider;
-  };
-
-  const getHistoryKey = () => {
-    if (provider === 'finnhub') return appSettings.keys.twelve || appSettings.keys.av;
-    return apiKey;
-  };
-
   const fetchPair = async (pair) => {
     if (provider === 'oanda') return;
-    const histProvider = getHistoryProvider();
-    if (!histProvider && provider === 'finnhub') throw new Error('Add a Twelve Data key in Settings.');
-    let closes;
-    const key = getHistoryKey();
-    if (histProvider === 'twelve') closes = await fetchTwelveData(pair, key);
-    else if (histProvider === 'av') {
-      const [from, to] = pair.split('/');
-      const url = `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=${encodeURIComponent(from)}&to_symbol=${encodeURIComponent(to)}&apikey=${key}&outputsize=full`;
-      const d = await (await fetch(url)).json();
-      if (d['Note']) throw new Error('Alpha Vantage rate limit hit.');
-      if (d['Information']) throw new Error(d['Information']);
-      const raw = d['Time Series FX (Daily)'];
-      if (!raw) throw new Error('No data');
-      closes = Object.entries(raw).sort((a,b) => new Date(a[0]) - new Date(b[0])).slice(-200).map(([,v]) => parseFloat(v['4. close']));
-    } else throw new Error('No historical data provider.');
-    if (!closes || closes.length < 21) throw new Error('Not enough data.');
-    setPairData(prev => ({ ...prev, [pair]: { ...prev[pair], closes } }));
+    const ohlc = await fetchHistoricalOHLC(pair);
+    if (!ohlc || ohlc.length < 21) throw new Error('Not enough data returned.');
+    const closes = ohlc.map(d => d.close);
+    setPairData(prev => ({ ...prev, [pair]: { ...prev[pair], closes, ohlc } }));
     updateCard(pair, closes);
   };
 
   const updateCard = (pair, closes) => {
-    const last = closes[closes.length-1];
+    const last = closes[closes.length - 1];
     const rsi = computeRSI(closes, 14);
     const sma20 = computeSMA(closes, 20);
     const sma50 = closes.length >= 50 ? computeSMA(closes, 50) : null;
-    const mom = closes.length > 10 ? last - closes[closes.length-11] : null;
+    const mom = closes.length > 10 ? last - closes[closes.length - 11] : null;
     const atr = computeATR(closes);
     setPairData(prev => ({
       ...prev,
@@ -79,8 +52,8 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  // Streaming
-  const startStreaming = () => {
+  // Finnhub streaming
+  useEffect(() => {
     if (provider === 'finnhub' && apiKey && activePairs.length > 0) {
       const ws = connectFinnhubStream(apiKey, activePairs, (pair, price, volume) => {
         setPairData(prev => {
@@ -97,10 +70,6 @@ export const AppProvider = ({ children }) => {
       });
       setFinnhubWs(ws);
     }
-  };
-
-  useEffect(() => {
-    startStreaming();
     return () => { if (finnhubWs) finnhubWs.close(); };
   }, [provider, apiKey, activePairs]);
 

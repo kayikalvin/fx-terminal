@@ -7,17 +7,9 @@ import {
   computeVolatilityPercentile,
 } from './indicators';
 
-/**
- * Compute a rich feature set for each candle in the series.
- * @param {number[]} closes – array of closing prices (oldest → newest)
- * @param {number[]} highs – (optional) high prices
- * @param {number[]} lows – (optional) low prices
- * @returns {object[]} array of feature objects with the same length as closes
- */
 export function computeFeatures(closes, highs = [], lows = []) {
   const features = [];
   const len = closes.length;
-  // Pre‑compute rolling indicators
   const rsiArr = [], sma20Arr = [], sma50Arr = [], atrArr = [], momArr = [];
   const dailyReturns = [];
 
@@ -41,26 +33,16 @@ export function computeFeatures(closes, highs = [], lows = []) {
     const mom = momArr[i];
     const dailyRet = dailyReturns[i];
 
-    // Distance from SMA (normalised by price)
     const dist20 = sma20 ? (close - sma20) / close : 0;
     const dist50 = sma50 ? (close - sma50) / close : 0;
-
-    // RSI zone (normalised 0–1)
-    const rsiNorm = (rsi - 50) / 50; // -1 to 1
-
-    // ATR as percentage of price
+    const rsiNorm = (rsi - 50) / 50;
     const atrPct = atr ? atr / close : 0;
-
-    // Volatility percentile (relative to last 100 candles)
-    const volPct = computeVolatilityPercentile(dailyReturns.slice(Math.max(0, i - 99), i + 1), Math.abs(dailyRet));
-
-    // Trend: 1 if SMA20 > SMA50, 0 otherwise
+    const volPct = computeVolatilityPercentile(
+      dailyReturns.slice(Math.max(0, i - 99), i + 1),
+      Math.abs(dailyRet)
+    );
     const trend = sma20 && sma50 ? (sma20 > sma50 ? 1 : 0) : 0;
-
-    // Weekly return (5‑day)
     const weeklyRet = i >= 5 ? (close - closes[i - 5]) / closes[i - 5] : 0;
-
-    // Monthly return (20‑day)
     const monthlyRet = i >= 20 ? (close - closes[i - 20]) / closes[i - 20] : 0;
 
     features.push({
@@ -72,7 +54,7 @@ export function computeFeatures(closes, highs = [], lows = []) {
       sma50,
       dist20,
       dist50,
-      atr: atrPct,         // already normalised
+      atr: atrPct,
       momentum: mom,
       dailyReturn: dailyRet,
       weeklyReturn: weeklyRet,

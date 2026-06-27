@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { connectFinnhubStream } from '../services/finnhubStream';
-import { fetchTwelveData } from '../services/twelveData';
-import { computeATR } from '../services/indicators';
 
 export default function Dashboard() {
   const {
@@ -26,11 +24,7 @@ export default function Dashboard() {
 
   const removePair = (pair) => {
     setActivePairs(activePairs.filter(p => p !== pair));
-    setPairData(prev => {
-      const n = { ...prev };
-      delete n[pair];
-      return n;
-    });
+    setPairData(prev => { const n = { ...prev }; delete n[pair]; return n; });
   };
 
   // Finnhub streaming
@@ -60,11 +54,7 @@ export default function Dashboard() {
       <div className="setup-bar">
         <div className="setup-group">
           <label>DATA SOURCE</label>
-          <select value={provider} onChange={e => {
-            const p = e.target.value;
-            setProvider(p);
-            setApiKey(appSettings.keys[p] || '');
-          }}>
+          <select value={provider} onChange={e => { const p = e.target.value; setProvider(p); setApiKey(appSettings.keys[p] || ''); }}>
             <option value="av">Alpha Vantage (25 req/day free)</option>
             <option value="twelve">Twelve Data (800 req/day free)</option>
             <option value="finnhub">Finnhub (live streaming)</option>
@@ -74,15 +64,7 @@ export default function Dashboard() {
         <div className="setup-group">
           <label>API KEY</label>
           <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste key here…" style={{ width: 260 }} />
-          <button className="btn-primary" onClick={() => {
-            const newKeys = { ...appSettings.keys, [provider]: apiKey };
-            const newSettings = { ...appSettings, keys: newKeys };
-            setAppSettings(newSettings);
-            setDashStatus('live: Key saved.');
-          }}>Save</button>
-          <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>
-            {appSettings.keys[provider] ? '✓ Key saved' : 'No key'}
-          </span>
+          <button className="btn-primary" onClick={() => { const newKeys = { ...appSettings.keys, [provider]: apiKey }; setAppSettings({ ...appSettings, keys: newKeys }); setDashStatus('live: Key saved.'); }}>Save</button>
         </div>
         <div className="setup-group">
           <label>ADD PAIR</label>
@@ -130,27 +112,11 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <div className="indicator">
-                <div className="ind-row"><span className="ind-label">VWAP</span><span className="ind-val neutral" id={`vwap-${id}`}>{data?.vwap?.toFixed(5) || '--'}</span></div>
-                <div className="ind-explain" id={`vwap-exp-${id}`}>Volume Weighted Average Price (intraday)</div>
-              </div>
-              <div className="indicator">
-                <div className="ind-row"><span className="ind-label">ATR (14)</span><span className="ind-val neutral" id={`atr-${id}`}>{data?.atr?.toFixed(5) || '--'}</span></div>
-                <div className="ind-explain" id={`atr-exp-${id}`}>Average True Range</div>
-              </div>
-              <div className="indicator">
-                <div className="ind-row"><span className="ind-label">RSI (14)</span><span className={`ind-val ${data?.rsi >= 70 ? 'bear' : data?.rsi <= 30 ? 'bull' : 'neutral'}`} id={`rsi-${id}`}>{data?.rsi?.toFixed(1) || '--'}</span></div>
-                <div className="bar-track"><div className="bar-fill" id={`rsi-bar-${id}`} style={{ width: `${data?.rsi || 0}%`, background: data?.rsi >= 70 ? 'var(--color-bear)' : data?.rsi <= 30 ? 'var(--color-bull)' : 'var(--color-amber)' }} /></div>
-                <div className="ind-explain" id={`rsi-exp-${id}`}>{data?.rsi >= 70 ? 'Overbought – RSI can stay above 70 in strong trends.' : data?.rsi <= 30 ? 'Oversold – RSI can stay below 30 in strong downtrends.' : 'Mid-range – No extreme reading.'}</div>
-              </div>
-              <div className="indicator">
-                <div className="ind-row"><span className="ind-label">Trend (SMA 20/50)</span><span className={`ind-val ${data?.sma20 > data?.sma50 ? 'bull' : 'bear'}`} id={`sma-${id}`}>{data?.sma20 > data?.sma50 ? '▲ Bullish' : '▼ Bearish'}</span></div>
-                <div className="ind-explain" id={`sma-exp-${id}`}>{data?.sma20 > data?.sma50 ? 'SMA 20 above SMA 50 – upward momentum.' : 'SMA 20 below SMA 50 – downward momentum.'}</div>
-              </div>
-              <div className="indicator">
-                <div className="ind-row"><span className="ind-label">Momentum (10-period)</span><span className={`ind-val ${data?.mom >= 0 ? 'bull' : 'bear'}`} id={`mom-${id}`}>{data?.mom != null ? ((data.mom / data.lastPrice) * 100).toFixed(3) + '%' : '--'}</span></div>
-                <div className="ind-explain" id={`mom-exp-${id}`}>{data?.mom >= 0 ? 'Price higher than 10 periods ago – net positive momentum.' : 'Price lower than 10 periods ago – net negative momentum.'}</div>
-              </div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">VWAP</span><span className="ind-val neutral" id={`vwap-${id}`}>{data?.vwap?.toFixed(5) || '--'}</span></div><div className="ind-explain">Volume Weighted Average Price (intraday)</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">ATR (14)</span><span className="ind-val neutral" id={`atr-${id}`}>{data?.atr?.toFixed(5) || '--'}</span></div><div className="ind-explain">Average True Range</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">RSI (14)</span><span className={`ind-val ${data?.rsi >= 70 ? 'bear' : data?.rsi <= 30 ? 'bull' : 'neutral'}`} id={`rsi-${id}`}>{data?.rsi?.toFixed(1) || '--'}</span></div><div className="bar-track"><div className="bar-fill" id={`rsi-bar-${id}`} style={{ width: `${data?.rsi || 0}%`, background: data?.rsi >= 70 ? 'var(--color-bear)' : data?.rsi <= 30 ? 'var(--color-bull)' : 'var(--color-amber)' }} /></div><div className="ind-explain">{data?.rsi >= 70 ? 'Overbought' : data?.rsi <= 30 ? 'Oversold' : 'Mid-range'}</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">Trend (SMA 20/50)</span><span className={`ind-val ${data?.sma20 > data?.sma50 ? 'bull' : 'bear'}`} id={`sma-${id}`}>{data?.sma20 > data?.sma50 ? '▲ Bullish' : '▼ Bearish'}</span></div><div className="ind-explain">{data?.sma20 > data?.sma50 ? 'SMA 20 above SMA 50' : 'SMA 20 below SMA 50'}</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">Momentum (10-period)</span><span className={`ind-val ${data?.mom >= 0 ? 'bull' : 'bear'}`} id={`mom-${id}`}>{data?.mom != null ? ((data.mom / data.lastPrice) * 100).toFixed(3) + '%' : '--'}</span></div><div className="ind-explain">{data?.mom >= 0 ? 'Net positive momentum' : 'Net negative momentum'}</div></div>
             </div>
           );
         })}
@@ -164,9 +130,8 @@ export default function Dashboard() {
           if (!d?.atr) return null;
           const atrPct = ((d.atr / d.lastPrice) * 100).toFixed(2);
           const comment = atrPct > 0.8 ? 'High' : atrPct > 0.4 ? 'Medium' : 'Low';
-          return <div key={pair} className="text-xs text-faint" style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>{pair}: ATR {d.atr.toFixed(5)} ({atrPct}%) – {comment} volatility</div>;
+          return <div key={pair} style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>{pair}: ATR {d.atr.toFixed(5)} ({atrPct}%) – {comment} volatility</div>;
         })}
-        {activePairs.length === 0 && <div style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>Add pairs to see volatility.</div>}
       </div>
 
       <div className="footer-note">
