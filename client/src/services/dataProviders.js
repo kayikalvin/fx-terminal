@@ -1,4 +1,21 @@
-// ─── Direct Yahoo Finance ─────────────────────────
+// ─── Proxy helper ─────────────────────────────────
+async function fetchWithProxy(url) {
+  // Try a few public CORS proxies; if one fails, use the next
+  const proxies = [
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    'https://api.codetabs.com/v1/proxy?quest='
+  ];
+  for (const proxy of proxies) {
+    try {
+      const resp = await fetch(proxy + encodeURIComponent(url));
+      if (resp.ok) return resp;
+    } catch (e) {}
+  }
+  throw new Error('All CORS proxies failed');
+}
+
+// ─── Yahoo Finance (direct – only works from backend) ───
 async function fetchYahoo(pair) {
   const symbol = pair.replace('/', '') + '=X';
   const period1 = Math.floor(Date.now() / 1000) - 86400 * 365 * 2;
@@ -24,15 +41,13 @@ async function fetchYahoo(pair) {
     .filter(d => d.close != null && d.time);
 }
 
-// ─── Yahoo Finance via CORS proxy (fallback) ────
-async function fetchYahooViaProxy(pair) {
+// ─── Yahoo Finance via CORS proxy ─────────────────
+async function fetchYahooProxy(pair) {
   const symbol = pair.replace('/', '') + '=X';
   const period1 = Math.floor(Date.now() / 1000) - 86400 * 365 * 2;
   const period2 = Math.floor(Date.now() / 1000);
-  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
-  const resp = await fetch(proxyUrl);
-  if (!resp.ok) throw new Error('Proxy Yahoo unavailable');
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=1d`;
+  const resp = await fetchWithProxy(url);
   const json = await resp.json();
   const result = json.chart.result[0];
   const t = result.timestamp;
@@ -51,12 +66,11 @@ async function fetchYahooViaProxy(pair) {
     .filter(d => d.close != null && d.time);
 }
 
-// ─── Stooq (last resort) ─────────────────────────
+// ─── Stooq (via proxy) ────────────────────────────
 async function fetchStooq(pair) {
   const symbol = pair.replace('/', '').toLowerCase();
   const url = `https://stooq.com/q/d/l/?s=${symbol}&i=d`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Stooq unavailable');
+  const resp = await fetchWithProxy(url);
   const text = await resp.text();
   const lines = text.trim().split('\n');
   const data = [];
@@ -76,32 +90,30 @@ async function fetchStooq(pair) {
   return data.sort((a, b) => a.time - b.time);
 }
 
-// ─── Main export: try Yahoo → proxy Yahoo → Stooq ───
+// ─── Main export ─────────────────────────────────
 export async function fetchHistoricalOHLC(pair) {
-  // 1. Direct Yahoo Finance (works from your network)
+  // 1. Try Yahoo via CORS proxy (since direct is blocked in browser)
+  try {
+    return await fetchYahooProxy(pair);
+  } catch (e) {
+    console.warn('Yahoo proxy failed:', e.message);
+  }
+
+  // 2. Try Stooq via proxy
+  try {
+    return await fetchStooq(pair);
+  } catch (e) {
+    console.warn('Stooq proxy failed:', e.message);
+  }
+
+  // 3. Last resort: direct Yahoo (may work if CORS is relaxed)
   try {
     return await fetchYahoo(pair);
   } catch (e) {
     console.warn('Direct Yahoo failed:', e.message);
   }
 
-  // 2. Yahoo via CORS proxy (if direct is blocked)
-  try {
-    return await fetchYahooViaProxy(pair);
-  } catch (e) {
-    console.warn('Proxy Yahoo failed:', e.message);
-  }
-
-  // 3. Stooq (may be blocked, but it's a fallback)
-  try {
-    return await fetchStooq(pair);
-  } catch (e) {
-    console.warn('Stooq failed:', e.message);
-  }
-
   throw new Error(
-    'All data sources are currently unavailable. ' +
-    'Please check your internet connection or try again later. ' +
-    '(If the problem persists, you can still use a Twelve Data key in Settings.)'
+    'All data sources are currently unavailable. Please check your internet connection.'
   );
 }

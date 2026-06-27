@@ -20,10 +20,10 @@ __pycache__/
 *.so
 
 # ML model files (optional – keep raw data, ignore generated)
-ml/data/processed/
-ml/models/*.pkl
-ml/reports/
-ml/exports/
+/data/processed/
+/models/*.pkl
+/reports/
+/exports/
 
 # Logs
 *.log
