@@ -3,13 +3,13 @@
 import yfinance as yf
 from pathlib import Path
 
-PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"]
+PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF","GOLD"]
 RAW_DIR = Path("data/raw")
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 for pair in PAIRS:
     ticker = pair + "=X"
-    df = yf.download(ticker, period="2y", interval="1d", auto_adjust=False)
+    df = yf.download(ticker, period="10y", interval="1d", auto_adjust=False)
     if df.empty:
         print(f"Failed to download {pair}")
         continue
