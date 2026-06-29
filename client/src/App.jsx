@@ -6,8 +6,9 @@ import Correlation from './components/Correlation';
 import Strength from './components/Strength';
 import Backtester from './components/Backtester';
 import News from './components/News';
-import Settings from './components/Settings';
 import MLResearch from './components/MLResearch';
+import Journal from './components/Journal';
+import Settings from './components/Settings';
 
 const tabs = [
   { num: '01', label: 'Dashboard', path: '/', component: Dashboard },
@@ -17,14 +18,14 @@ const tabs = [
   { num: '05', label: 'Strength', path: '/strength', component: Strength },
   { num: '06', label: 'Backtester', path: '/backtest', component: Backtester },
   { num: '07', label: 'News & COT', path: '/news', component: News },
-  { num: '08', label: 'Settings', path: '/settings', component: Settings },
-  { num: '09', label: 'ML Research', path: '/ml', component: MLResearch },
+  { num: '08', label: 'ML Research', path: '/ml', component: MLResearch },
+  { num: '09', label: 'Journal', path: '/journal', component: Journal },
+  { num: '10', label: 'Settings', path: '/settings', component: Settings },
 ];
 
 export default function App() {
   return (
-    <div>
-      {/* Topbar – uses original classes */}
+    <div className="min-h-screen bg-bg text-text">
       <nav className="topbar">
         <div className="brand">FX<span>/</span>TERMINAL</div>
         <div className="nav-tabs">
@@ -33,7 +34,9 @@ export default function App() {
               key={tab.path}
               to={tab.path}
               end={tab.path === '/'}
-              className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
+              className={({ isActive }) =>
+                `nav-tab ${isActive ? 'active' : ''}`
+              }
             >
               <span className="tab-num">{tab.num}</span>
               {tab.label}
@@ -42,13 +45,13 @@ export default function App() {
         </div>
         <div className="pill">RESEARCH ONLY · NOT FINANCIAL ADVICE</div>
       </nav>
-
-      {/* Main content – each page wrapped in a .page container */}
-      <Routes>
-        {tabs.map(tab => (
-          <Route key={tab.path} path={tab.path} element={<tab.component />} />
-        ))}
-      </Routes>
+      <main className="py-7 px-7 max-w-[1400px] mx-auto">
+        <Routes>
+          {tabs.map(tab => (
+            <Route key={tab.path} path={tab.path} element={<tab.component />} />
+          ))}
+        </Routes>
+      </main>
     </div>
   );
 }

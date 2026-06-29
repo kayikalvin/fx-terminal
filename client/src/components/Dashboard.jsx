@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { connectFinnhubStream } from '../services/finnhubStream';
 
 export default function Dashboard() {
   const {
@@ -9,11 +8,11 @@ export default function Dashboard() {
     apiKey, setApiKey,
     activePairs, setActivePairs,
     pairData, setPairData,
-    finnhubWs, setFinnhubWs,
+    mt5Status, selectedPair, setSelectedPair,
     safeid, fetchPair
   } = useAppContext();
 
-  const [dashStatus, setDashStatus] = useState('Save a Finnhub API key for live streaming.');
+  const [dashStatus, setDashStatus] = useState('Connect to MT5 or enter a Finnhub key.');
   const pairSelectRef = useRef(null);
 
   const addPair = (pair) => {
@@ -27,45 +26,32 @@ export default function Dashboard() {
     setPairData(prev => { const n = { ...prev }; delete n[pair]; return n; });
   };
 
-  // Finnhub streaming
-  useEffect(() => {
-    if (provider === 'finnhub' && apiKey && activePairs.length) {
-      const ws = connectFinnhubStream(apiKey, activePairs, (pair, price, volume) => {
-        setPairData(prev => {
-          const d = prev[pair] || { ticks: [] };
-          d.lastPrice = price;
-          if (volume) {
-            d.cumVolPrice = (d.cumVolPrice || 0) + price * volume;
-            d.cumVolume = (d.cumVolume || 0) + volume;
-            d.vwap = d.cumVolume > 0 ? d.cumVolPrice / d.cumVolume : null;
-          }
-          d.ticks = [...(d.ticks || []).slice(-499), { time: Date.now(), mid: price }];
-          return { ...prev, [pair]: d };
-        });
-      });
-      setFinnhubWs(ws);
-      setDashStatus('live: Finnhub stream connected');
-      return () => ws.close();
-    }
-  }, [provider, apiKey, activePairs]);
-
   return (
     <div className="page">
       <div className="setup-bar">
         <div className="setup-group">
           <label>DATA SOURCE</label>
-          <select value={provider} onChange={e => { const p = e.target.value; setProvider(p); setApiKey(appSettings.keys[p] || ''); }}>
-            <option value="av">Alpha Vantage (25 req/day free)</option>
-            <option value="twelve">Twelve Data (800 req/day free)</option>
+          <select value={provider} onChange={e => {
+            const p = e.target.value;
+            setProvider(p);
+            setApiKey(appSettings.keys[p] || '');
+          }}>
+            <option value="mt5">MetaTrader 5 (local bridge)</option>
             <option value="finnhub">Finnhub (live streaming)</option>
-            <option value="oanda">OANDA Practice (needs account)</option>
+            <option value="oanda">OANDA Practice</option>
           </select>
         </div>
-        <div className="setup-group">
-          <label>API KEY</label>
-          <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste key here…" style={{ width: 260 }} />
-          <button className="btn-primary" onClick={() => { const newKeys = { ...appSettings.keys, [provider]: apiKey }; setAppSettings({ ...appSettings, keys: newKeys }); setDashStatus('live: Key saved.'); }}>Save</button>
-        </div>
+        {provider !== 'mt5' && (
+          <div className="setup-group">
+            <label>API KEY</label>
+            <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste key here…" style={{ width: 260 }} />
+            <button className="btn-primary" onClick={() => {
+              const newKeys = { ...appSettings.keys, [provider]: apiKey };
+              setAppSettings({ ...appSettings, keys: newKeys });
+              setDashStatus('live: Key saved.');
+            }}>Save</button>
+          </div>
+        )}
         <div className="setup-group">
           <label>ADD PAIR</label>
           <select ref={pairSelectRef}>
@@ -73,9 +59,6 @@ export default function Dashboard() {
               <option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option>
               <option>USD/CHF</option><option>AUD/USD</option><option>USD/CAD</option>
               <option>NZD/USD</option>
-            </optgroup>
-            <optgroup label="Commodities">
-              <option>XAU/USD</option><option>XAG/USD</option>
             </optgroup>
           </select>
           <button className="btn-primary" onClick={() => addPair(pairSelectRef.current?.value)}>Add to panel</button>
@@ -85,6 +68,11 @@ export default function Dashboard() {
       <div className="status-row">
         <span className={`dot ${dashStatus.startsWith('live') ? 'live' : dashStatus.startsWith('error') ? 'error' : 'loading'}`} />
         {dashStatus}
+        {provider === 'mt5' && (
+          <span className={`connection-pill ${mt5Status === 'connected' ? 'live' : 'error'}`} style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, background: mt5Status === 'connected' ? 'var(--color-bull-bg)' : 'var(--color-bear-bg)', color: mt5Status === 'connected' ? 'var(--color-bull)' : 'var(--color-bear)', fontSize: 11 }}>
+            MT5: {mt5Status}
+          </span>
+        )}
       </div>
 
       <div className="card-grid">
@@ -98,7 +86,9 @@ export default function Dashboard() {
             <div key={pair} className="card">
               <button className="remove-btn" onClick={() => removePair(pair)}>×</button>
               <div className="card-head">
-                <span className="pair-tag">{pair}</span>
+                <span className="pair-tag" onClick={() => setSelectedPair(pair)} style={{ cursor: 'pointer', color: selectedPair === pair ? 'var(--color-accent)' : 'inherit' }}>
+                  {pair}
+                </span>
                 <div className="card-meta">
                   <div id={`src-${id}`}>via {provider.toUpperCase()}</div>
                   <div id={`updated-${id}`}>{data?.lastPrice ? new Date().toLocaleTimeString() : '--'}</div>
@@ -112,11 +102,11 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <div className="indicator"><div className="ind-row"><span className="ind-label">VWAP</span><span className="ind-val neutral" id={`vwap-${id}`}>{data?.vwap?.toFixed(5) || '--'}</span></div><div className="ind-explain">Volume Weighted Average Price (intraday)</div></div>
-              <div className="indicator"><div className="ind-row"><span className="ind-label">ATR (14)</span><span className="ind-val neutral" id={`atr-${id}`}>{data?.atr?.toFixed(5) || '--'}</span></div><div className="ind-explain">Average True Range</div></div>
-              <div className="indicator"><div className="ind-row"><span className="ind-label">RSI (14)</span><span className={`ind-val ${data?.rsi >= 70 ? 'bear' : data?.rsi <= 30 ? 'bull' : 'neutral'}`} id={`rsi-${id}`}>{data?.rsi?.toFixed(1) || '--'}</span></div><div className="bar-track"><div className="bar-fill" id={`rsi-bar-${id}`} style={{ width: `${data?.rsi || 0}%`, background: data?.rsi >= 70 ? 'var(--color-bear)' : data?.rsi <= 30 ? 'var(--color-bull)' : 'var(--color-amber)' }} /></div><div className="ind-explain">{data?.rsi >= 70 ? 'Overbought' : data?.rsi <= 30 ? 'Oversold' : 'Mid-range'}</div></div>
-              <div className="indicator"><div className="ind-row"><span className="ind-label">Trend (SMA 20/50)</span><span className={`ind-val ${data?.sma20 > data?.sma50 ? 'bull' : 'bear'}`} id={`sma-${id}`}>{data?.sma20 > data?.sma50 ? '▲ Bullish' : '▼ Bearish'}</span></div><div className="ind-explain">{data?.sma20 > data?.sma50 ? 'SMA 20 above SMA 50' : 'SMA 20 below SMA 50'}</div></div>
-              <div className="indicator"><div className="ind-row"><span className="ind-label">Momentum (10-period)</span><span className={`ind-val ${data?.mom >= 0 ? 'bull' : 'bear'}`} id={`mom-${id}`}>{data?.mom != null ? ((data.mom / data.lastPrice) * 100).toFixed(3) + '%' : '--'}</span></div><div className="ind-explain">{data?.mom >= 0 ? 'Net positive momentum' : 'Net negative momentum'}</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">VWAP</span><span className="ind-val neutral">{data?.vwap?.toFixed(5) || '--'}</span></div><div className="ind-explain">Volume Weighted Average Price</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">ATR (14)</span><span className="ind-val neutral">{data?.atr?.toFixed(5) || '--'}</span></div><div className="ind-explain">Average True Range</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">RSI (14)</span><span className={`ind-val ${data?.rsi >= 70 ? 'bear' : data?.rsi <= 30 ? 'bull' : 'neutral'}`}>{data?.rsi?.toFixed(1) || '--'}</span></div><div className="bar-track"><div className="bar-fill" style={{ width: `${data?.rsi || 0}%`, background: data?.rsi >= 70 ? 'var(--color-bear)' : data?.rsi <= 30 ? 'var(--color-bull)' : 'var(--color-amber)' }} /></div><div className="ind-explain">{data?.rsi >= 70 ? 'Overbought' : data?.rsi <= 30 ? 'Oversold' : 'Mid-range'}</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">Trend (SMA 20/50)</span><span className={`ind-val ${data?.sma20 > data?.sma50 ? 'bull' : 'bear'}`}>{data?.sma20 > data?.sma50 ? '▲ Bullish' : '▼ Bearish'}</span></div><div className="ind-explain">{data?.sma20 > data?.sma50 ? 'SMA 20 above SMA 50' : 'SMA 20 below SMA 50'}</div></div>
+              <div className="indicator"><div className="ind-row"><span className="ind-label">Momentum (10-period)</span><span className={`ind-val ${data?.mom >= 0 ? 'bull' : 'bear'}`}>{data?.mom != null ? ((data.mom / data.lastPrice) * 100).toFixed(3) + '%' : '--'}</span></div><div className="ind-explain">{data?.mom >= 0 ? 'Net positive momentum' : 'Net negative momentum'}</div></div>
             </div>
           );
         })}
