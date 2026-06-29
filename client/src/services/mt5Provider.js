@@ -19,13 +19,19 @@ export async function fetchMT5Price(pair, serverUrl) {
 export async function fetchMT5HistoricalOHLC(pair, serverUrl, timeframe = 'D', bars = 500) {
   const symbol = pair.replace('/', '');
   const data = await fetchFromMT5(`history/${symbol}?timeframe=${timeframe}&bars=${bars}`, serverUrl);
-  // MT5 returns Date (ISO), Open, High, Low, Close, Volume
-  return data.map(d => ({
-    time: Math.floor(new Date(d.Date).getTime() / 1000),
-    open: d.Open,
-    high: d.High,
-    low: d.Low,
-    close: d.Close,
-    volume: d.Volume || 0,
-  }));
+
+  const mapped = data
+    .map(d => ({
+      time: Math.floor(new Date(d.Date).getTime() / 1000),
+      open: d.Open,
+      high: d.High,
+      low: d.Low,
+      close: d.Close,
+      volume: d.Volume || 0,
+    }))
+    .filter(d => Number.isFinite(d.time) && Number.isFinite(d.close));
+
+  const seen = new Map();
+  for (const bar of mapped) seen.set(bar.time, bar);
+  return Array.from(seen.values()).sort((a, b) => a.time - b.time);
 }

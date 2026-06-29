@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { fetchHistoricalOHLC } from '../services/dataProviders';
 import { computeRSI, computeSMA } from '../services/indicators';
@@ -12,7 +12,9 @@ export default function Backtester() {
   const [dir, setDir] = useState('long');
   const [stop, setStop] = useState(1.5);
   const [tp, setTp] = useState(3);
-  const [results, setResults] = useState(null);
+  const [results, setResults] = useState(null); // { statsHtml, tableHtml, equity }
+
+  const canvasRef = useRef(null);
 
   const exportDataset = () => {
     const data = pairData[pair]?.closes;
@@ -95,7 +97,7 @@ export default function Backtester() {
     }
 
     if (!trades.length) {
-      setResults(<div className="placeholder-block"><p>No trades triggered.</p></div>);
+      setResults({ empty: true });
       return;
     }
 
@@ -121,7 +123,9 @@ export default function Backtester() {
         <div class="stat-card"><div class="stat-label">Avg loss</div><div class="stat-val bear">${avgLoss}%</div></div>
         <div class="stat-card"><div class="stat-label">Sharpe</div><div class="stat-val neutral">${sharpe}</div><div class="stat-note">Risk-adjusted</div></div>
       </div>
-      <div class="equity-chart"><canvas id="equityCanvas" height="160"></canvas></div>
+    `;
+
+    const tableHtml = `
       <div class="trade-log-wrap">
         <div class="trade-log-head">TRADE LOG — ${pair} · ${dir.toUpperCase()} · ${entry.replace(/_/g, ' ')}</div>
         <div class="trade-log-scroll">
@@ -142,13 +146,25 @@ export default function Backtester() {
       </div>
     `;
 
-    setResults(statsHtml);
-    setTimeout(() => {
-      const canvas = document.getElementById('equityCanvas');
-      if (!canvas) return;
+    // equity stored as real state -> canvas is a real React element redrawn by useEffect,
+    // so it survives any unrelated re-render (e.g. background MT5 polling on the Charts tab)
+    setResults({ statsHtml, tableHtml, equity });
+  };
+
+  // Redraw the equity curve any time `results.equity` changes OR the canvas element
+  // itself gets recreated by React (covers container resizes too).
+  useEffect(() => {
+    if (!results || results.empty) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const draw = () => {
+      const equity = results.equity;
+      const W = canvas.parentElement.clientWidth - 32 || 300;
+      const H = 160;
+      canvas.width = W;
+      canvas.height = H;
       const ctx = canvas.getContext('2d');
-      const W = canvas.parentElement.clientWidth - 32, H = 160;
-      canvas.width = W; canvas.height = H;
       const min = Math.min(...equity), max = Math.max(...equity), range = max - min || 1, pad = 8;
       ctx.clearRect(0, 0, W, H);
       ctx.strokeStyle = '#1E2D45';
@@ -170,8 +186,15 @@ export default function Backtester() {
       ctx.strokeStyle = finalAbove100 ? '#3DB87C' : '#E05A3A'; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = '#3D4A61'; ctx.font = '10px JetBrains Mono';
       ctx.fillText(max.toFixed(1), 4, 14); ctx.fillText(min.toFixed(1), 4, H - 4);
-    }, 50);
-  };
+    };
+
+    draw();
+
+    // Redraw on container resize too (e.g. sidebar toggle, window resize)
+    const ro = new ResizeObserver(draw);
+    ro.observe(canvas.parentElement);
+    return () => ro.disconnect();
+  }, [results]);
 
   return (
     <div className="page">
@@ -221,8 +244,16 @@ export default function Backtester() {
           <p style={{ fontSize: 11, color: 'var(--color-text-faint)', lineHeight: 1.6 }}>Uses daily closes from Yahoo Finance / Stooq. No API key needed.</p>
         </div>
         <div className="backtest-results" id="btResults">
-          {results ? (
-            <div dangerouslySetInnerHTML={{ __html: results }} />
+          {results && !results.empty ? (
+            <>
+              <div dangerouslySetInnerHTML={{ __html: results.statsHtml }} />
+              <div className="equity-chart">
+                <canvas ref={canvasRef} height="160" />
+              </div>
+              <div dangerouslySetInnerHTML={{ __html: results.tableHtml }} />
+            </>
+          ) : results?.empty ? (
+            <div className="placeholder-block"><p>No trades triggered.</p></div>
           ) : (
             <div className="placeholder-block" style={{ padding: 48 }}>
               <p>Configure a strategy on the left and click Run backtest.<br />Results will appear here.</p>
