@@ -3,45 +3,21 @@ import { createChart } from "lightweight-charts";
 import { useAppContext } from "../context/AppContext";
 import { fetchHistoricalOHLC } from "../services/dataProviders";
 
-/* ─── tokens ─────────────────────────────────────────────────────────────── */
-const T = {
-  void:    "#0A0D14",
-  surface: "#0F1520",
-  raised:  "#141D2E",
-  border:  "#1C2A40",
-  accent:  "#C8A96E",   // amber — active states & pair name only
-  bull:    "#4DFFB4",
-  bear:    "#FF5A5A",
-  dim:     "#3D5070",
-  muted:   "#566880",
-  text:    "#A8BBC8",
-  bright:  "#DCE8F0",
-};
-
-/* ─── chart theme ─────────────────────────────────────────────────────────── */
-const CHART_OPTS = {
-  layout:          { background: { color: T.surface }, textColor: T.muted },
-  grid:            { vertLines: { color: T.border }, horzLines: { color: T.border } },
-  rightPriceScale: { borderColor: T.border },
-  timeScale:       { borderColor: T.border, timeVisible: true, secondsVisible: false },
-  crosshair:       { mode: 1 },
-};
-
-/* ─── static data ─────────────────────────────────────────────────────────── */
+/* ─── timeframes ─────────────────────────────────────────────────────────── */
 const TIMEFRAMES = [
-  { label: "1m", value: "M1" },
-  { label: "5m", value: "M5" },
+  { label: "1m",  value: "M1"  },
+  { label: "5m",  value: "M5"  },
   { label: "15m", value: "M15" },
-  { label: "1H", value: "H1" },
-  { label: "4H", value: "H4" },
-  { label: "1D", value: "D" },
+  { label: "1H",  value: "H1"  },
+  { label: "4H",  value: "H4"  },
+  { label: "1D",  value: "D"   },
 ];
 
 const POLL_INTERVAL_MS = {
   M1: 5000, M5: 15000, M15: 30000, H1: 60000, H4: 60000, D: 60000,
 };
 
-/* ─── indicator math ─────────────────────────────────────────────────────── */
+/* ─── indicator math ──────────────────────────────────────────────────────── */
 function average(v) { return v.reduce((a, b) => a + b, 0) / v.length; }
 
 function computeSMA(ohlc, p) {
@@ -85,242 +61,17 @@ function computeRSI(ohlc, period = 14) {
   return rsi;
 }
 
-/* ─── helpers ────────────────────────────────────────────────────────────── */
-const fmt = (n, d = 5) => n == null ? "—" : Number(n).toFixed(d);
-
-/* ─── inline styles (CSS-in-JS, no class dependency) ─────────────────────── */
-const styles = {
-  page: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 0,
-    background: T.void,
-    minHeight: "100vh",
-    padding: "20px 24px 32px",
-    fontFamily: "'Inter', system-ui, sans-serif",
-    color: T.text,
-    boxSizing: "border-box",
-  },
-
-  /* ── header ── */
-  header: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: 12,
-    marginBottom: 16,
-    borderBottom: `1px solid ${T.border}`,
-    paddingBottom: 14,
-  },
-  pairName: {
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    fontSize: 22,
-    fontWeight: 700,
-    letterSpacing: "0.04em",
-    color: T.accent,
-  },
-  headerSub: {
-    fontSize: 11,
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
-    color: T.muted,
-  },
-  liveIndicator: (live) => ({
-    marginLeft: "auto",
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 11,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-    color: live ? T.bull : T.muted,
-  }),
-  liveDot: (live) => ({
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    background: live ? T.bull : T.dim,
-    boxShadow: live ? `0 0 6px ${T.bull}` : "none",
-    transition: "box-shadow 0.3s",
-  }),
-
-  /* ── toolbar rail ── */
-  toolbar: {
-    display: "flex",
-    alignItems: "center",
-    gap: 0,
-    marginBottom: 12,
-    background: T.raised,
-    border: `1px solid ${T.border}`,
-    borderRadius: 4,
-    overflow: "hidden",
-    height: 36,
-  },
-  pairSelect: {
-    appearance: "none",
-    background: "transparent",
-    border: "none",
-    borderRight: `1px solid ${T.border}`,
-    color: T.bright,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 13,
-    fontWeight: 600,
-    padding: "0 32px 0 14px",
-    height: "100%",
-    cursor: "pointer",
-    outline: "none",
-    minWidth: 140,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23566880' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat",
-    backgroundPosition: "right 10px center",
-  },
-  tfGroup: {
-    display: "flex",
-    alignItems: "center",
-    borderRight: `1px solid ${T.border}`,
-    height: "100%",
-  },
-  tfBtn: (active) => ({
-    background: "transparent",
-    border: "none",
-    borderRight: `1px solid ${T.border}`,
-    color: active ? T.accent : T.muted,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12,
-    fontWeight: active ? 700 : 400,
-    padding: "0 13px",
-    height: "100%",
-    cursor: "pointer",
-    letterSpacing: "0.04em",
-    transition: "color 0.15s",
-    position: "relative",
-    // bottom accent bar on active
-    ...(active ? {
-      background: `linear-gradient(to top, ${T.accent}22 0%, transparent 60%)`,
-    } : {}),
-  }),
-  liveBtn: (live) => ({
-    background: "transparent",
-    border: "none",
-    color: live ? T.bull : T.muted,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
-    fontWeight: 600,
-    padding: "0 14px",
-    height: "100%",
-    cursor: "pointer",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    display: "flex",
-    alignItems: "center",
-    gap: 7,
-    transition: "color 0.15s",
-  }),
-
-  /* ── stats ticker ── */
-  statsTicker: {
-    display: "flex",
-    alignItems: "stretch",
-    background: T.raised,
-    border: `1px solid ${T.border}`,
-    borderRadius: 4,
-    marginBottom: 8,
-    overflow: "hidden",
-    height: 42,
-    fontFamily: "'JetBrains Mono', monospace",
-  },
-  statsCell: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    padding: "0 16px",
-    borderRight: `1px solid ${T.border}`,
-    minWidth: 80,
-  },
-  statsCellLabel: {
-    fontSize: 9,
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-    color: T.dim,
-    marginBottom: 2,
-  },
-  statsCellValue: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: T.bright,
-    letterSpacing: "0.02em",
-  },
-  statsEmpty: {
-    display: "flex",
-    alignItems: "center",
-    padding: "0 16px",
-    fontSize: 11,
-    color: T.dim,
-    letterSpacing: "0.08em",
-    fontFamily: "'JetBrains Mono', monospace",
-  },
-
-  /* ── chart panes ── */
-  mainPane: {
-    width: "100%",
-    minHeight: 420,
-    height: 560,
-    background: T.surface,
-    border: `1px solid ${T.border}`,
-    borderRadius: "4px 4px 0 0",
-    overflow: "hidden",
-  },
-  rsiPane: {
-    width: "100%",
-    height: 120,
-    background: T.surface,
-    border: `1px solid ${T.border}`,
-    borderTop: "none",
-    borderRadius: "0 0 4px 4px",
-    overflow: "hidden",
-    marginBottom: 16,
-  },
-  rsiLabel: {
-    position: "absolute",
-    top: 6,
-    left: 8,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 9,
-    letterSpacing: "0.12em",
-    color: T.dim,
-    textTransform: "uppercase",
-    pointerEvents: "none",
-  },
-  rsiWrapper: {
-    position: "relative",
-    width: "100%",
-  },
-
-  /* ── legend ── */
-  legend: {
-    display: "flex",
-    gap: 20,
-    padding: "10px 14px",
-    background: T.raised,
-    border: `1px solid ${T.border}`,
-    borderRadius: 4,
-    flexWrap: "wrap",
-  },
-  legendItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: 7,
-    fontSize: 11,
-    color: T.muted,
-    letterSpacing: "0.04em",
-  },
-  legendDot: (color) => ({
-    width: 18,
-    height: 2,
-    background: color,
-    borderRadius: 1,
-    flexShrink: 0,
-  }),
+/* ─── lightweight-charts theme (mirrors CSS variables as literals) ────────── */
+const CHART_THEME = {
+  layout:          { background: { color: "#111827" }, textColor: "#7A859E" },
+  grid:            { vertLines: { color: "#1E2D45" },  horzLines: { color: "#1E2D45" } },
+  rightPriceScale: { borderColor: "#1E2D45" },
+  timeScale:       { borderColor: "#1E2D45", timeVisible: true, secondsVisible: false },
+  crosshair:       { mode: 1 },
 };
+
+/* ─── helpers ─────────────────────────────────────────────────────────────── */
+const fmt = (n, d = 5) => n == null ? "—" : Number(n).toFixed(d);
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function Charts() {
@@ -331,6 +82,7 @@ export default function Charts() {
   const [hoverInfo, setHoverInfo]       = useState(null);
   const [latestStats, setLatestStats]   = useState(null);
   const [loadError, setLoadError]       = useState(null);
+  const [isLoading, setIsLoading]       = useState(false);
 
   const chartContainerRef = useRef(null);
   const rsiContainerRef   = useRef(null);
@@ -343,7 +95,7 @@ export default function Charts() {
 
   const cacheKey = (pair, tf) => `${pair}_${tf}`;
 
-  /* ── chart lifecycle ─────────────────────────────────────────────────────── */
+  /* ── chart lifecycle ──────────────────────────────────────────────────────── */
   const destroyChart = useCallback(() => {
     if (resizeObserverRef.current) { resizeObserverRef.current.disconnect(); resizeObserverRef.current = null; }
     if (chartRef.current)    { chartRef.current.remove();    chartRef.current = null; }
@@ -358,27 +110,26 @@ export default function Charts() {
     destroyChart();
 
     const chart = createChart(container, {
-      ...CHART_OPTS,
+      ...CHART_THEME,
       width:  container.clientWidth  || 800,
-      height: container.clientHeight || 560,
+      height: container.clientHeight || 520,
     });
 
     const candleSeries = chart.addCandlestickSeries({
-      upColor:        T.bull,  downColor:        T.bear,
-      borderUpColor:  T.bull,  borderDownColor:  T.bear,
-      wickUpColor:    T.bull,  wickDownColor:    T.bear,
+      upColor:       "#3DB87C", downColor:       "#E05A3A",
+      borderUpColor: "#3DB87C", borderDownColor: "#E05A3A",
+      wickUpColor:   "#3DB87C", wickDownColor:   "#E05A3A",
       priceScaleId: "right",
     });
 
     const volumeSeries = chart.addHistogramSeries({
-      color: T.dim,
       priceFormat: { type: "volume" },
       priceScaleId: "volume",
     });
     chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.88, bottom: 0 } });
 
     const sma20 = chart.addLineSeries({ color: "#4A90D9", lineWidth: 1, priceLineVisible: false });
-    const sma50 = chart.addLineSeries({ color: T.accent,  lineWidth: 1, priceLineVisible: false });
+    const sma50 = chart.addLineSeries({ color: "#E0A840", lineWidth: 1, priceLineVisible: false });
 
     chart.subscribeCrosshairMove(param => {
       if (!param.time || !param.seriesData.size) { setHoverInfo(null); return; }
@@ -387,17 +138,17 @@ export default function Charts() {
       if (c) setHoverInfo({ time: param.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: v?.value ?? null });
     });
 
-    /* ── RSI sub-chart ── */
+    /* RSI sub-chart */
     const rsiChart = createChart(rsiContainer, {
-      ...CHART_OPTS,
+      ...CHART_THEME,
       width:  rsiContainer.clientWidth  || 800,
       height: rsiContainer.clientHeight || 120,
-      timeScale: { ...CHART_OPTS.timeScale, timeVisible: false, secondsVisible: false },
+      timeScale: { ...CHART_THEME.timeScale, timeVisible: false, secondsVisible: false },
     });
 
-    const rsiLine      = rsiChart.addLineSeries({ color: T.accent, lineWidth: 1, priceLineVisible: false });
-    const overbought   = rsiChart.addLineSeries({ color: T.bear,   lineWidth: 1, lineStyle: 2, priceLineVisible: false });
-    const oversold     = rsiChart.addLineSeries({ color: T.bull,   lineWidth: 1, lineStyle: 2, priceLineVisible: false });
+    const rsiLine    = rsiChart.addLineSeries({ color: "#E0A840", lineWidth: 1, priceLineVisible: false });
+    const overbought = rsiChart.addLineSeries({ color: "#E05A3A", lineWidth: 1, lineStyle: 2, priceLineVisible: false });
+    const oversold   = rsiChart.addLineSeries({ color: "#3DB87C", lineWidth: 1, lineStyle: 2, priceLineVisible: false });
 
     chartRef.current    = chart;
     rsiChartRef.current = rsiChart;
@@ -433,9 +184,9 @@ export default function Charts() {
 
     candle.setData(sorted);
     vol.setData(sorted.map(d => ({
-      time: d.time,
+      time:  d.time,
       value: d.volume ?? 0,
-      color: d.close >= d.open ? `${T.bull}55` : `${T.bear}55`,
+      color: d.close >= d.open ? "rgba(61,184,124,0.55)" : "rgba(224,90,58,0.55)",
     })));
     sma20?.setData(computeSMA(sorted, 20));
     sma50?.setData(computeSMA(sorted, 50));
@@ -451,10 +202,10 @@ export default function Charts() {
 
     const last = sorted[sorted.length - 1], prev = sorted[sorted.length - 2];
     setLatestStats({
-      close:     last.close,
       open:      last.open,
       high:      last.high,
       low:       last.low,
+      close:     last.close,
       volume:    last.volume,
       changePct: prev ? ((last.close - prev.close) / prev.close) * 100 : null,
       atr:       computeATR(sorted),
@@ -464,10 +215,7 @@ export default function Charts() {
   const loadChart = useCallback(async (pair, tf, { silent = false } = {}) => {
     if (!pair) return;
     setLoadError(null);
-    if (!silent) {
-      setHoverInfo(null);
-      setLatestStats(null);
-    }
+    if (!silent) { setIsLoading(true); setHoverInfo(null); setLatestStats(null); }
 
     let ohlc;
     try {
@@ -480,6 +228,7 @@ export default function Charts() {
       if (!ohlc || ohlc.length < 20) throw new Error("Not enough historical data.");
     } catch (e) {
       setLoadError(e.message);
+      setIsLoading(false);
       return;
     }
 
@@ -487,13 +236,23 @@ export default function Charts() {
       await new Promise(resolve => requestAnimationFrame(resolve));
       buildChart();
     }
-    if (!chartRef.current) { setLoadError("Chart container not ready."); return; }
+    if (!chartRef.current) {
+      setLoadError("Chart container not ready.");
+      setIsLoading(false);
+      return;
+    }
 
-    try { renderData(ohlc); }
-    catch (e) { console.error("renderData:", e); setLoadError(e.message); }
+    try {
+      renderData(ohlc);
+    } catch (e) {
+      console.error("renderData:", e);
+      setLoadError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
   }, [pairData, setPairData, buildChart, renderData]);
 
-  /* ── effects ─────────────────────────────────────────────────────────────── */
+  /* ── effects ──────────────────────────────────────────────────────────────── */
   useEffect(() => {
     destroyChart();
     if (selectedPair) loadChart(selectedPair, timeframe);
@@ -507,139 +266,246 @@ export default function Charts() {
     return () => clearInterval(pollRef.current);
   }, [liveEnabled, selectedPair, timeframe, loadChart]);
 
-  /* ── derived display values ──────────────────────────────────────────────── */
+  /* ── derived display values ───────────────────────────────────────────────── */
   const displayStats = hoverInfo
     ? { open: hoverInfo.open, high: hoverInfo.high, low: hoverInfo.low, close: hoverInfo.close, volume: hoverInfo.volume, changePct: null, atr: null }
     : latestStats;
 
-  const changePct = displayStats?.changePct;
-  const changeColor = changePct == null ? T.muted : changePct >= 0 ? T.bull : T.bear;
+  const changePct     = displayStats?.changePct;
+  const changePctSign = changePct == null ? "" : changePct >= 0 ? "+" : "";
+  const changeClass   = changePct == null ? "" : changePct >= 0 ? "bull" : "bear";
+
+  /* ── status dot state ─────────────────────────────────────────────────────── */
+  const dotClass = loadError ? "error" : isLoading ? "loading" : liveEnabled ? "live" : "";
+
+  const statusText = loadError
+    ? loadError
+    : isLoading
+    ? "loading…"
+    : selectedPair
+    ? liveEnabled
+      ? `polling every ${POLL_INTERVAL_MS[timeframe] / 1000}s`
+      : "updates paused"
+    : "select a pair to begin";
 
   /* ═══════════════════════════════════════════════════════════════════════════ */
   return (
-    <>
-      {/* Google Fonts — JetBrains Mono + Inter */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+    <div className="page">
 
-      <div style={styles.page}>
+      {/* ── Page header ───────────────────────────────────────────────────────── */}
+      <div className="section-head" style={{ marginBottom: 20 }}>
+        <span
+          className="section-title"
+          style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--color-accent)" }}
+        >
+          {selectedPair || "—"}
+        </span>
+        <span className="section-sub">
+          candlestick ·{" "}
+          {TIMEFRAMES.find(t => t.value === timeframe)?.label ?? timeframe}
+        </span>
+        {/* Live / paused badge — reuses .pill from topbar */}
+        <span
+          className="pill"
+          style={{
+            marginLeft: "auto",
+            color: liveEnabled ? "var(--color-bull)" : "var(--color-text-faint)",
+            borderColor: liveEnabled ? "var(--color-bull-dim)" : "var(--color-border)",
+            background: liveEnabled ? "var(--color-bull-bg)" : "transparent",
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+          onClick={() => setLiveEnabled(v => !v)}
+          title={liveEnabled ? "Click to pause" : "Click to resume live updates"}
+        >
+          {liveEnabled ? "● LIVE" : "⏸ PAUSED"}
+        </span>
+      </div>
 
-        {/* ── Header ── */}
-        <div style={styles.header}>
-          <span style={styles.pairName}>
-            {selectedPair || "—"}
-          </span>
-          <span style={styles.headerSub}>
-            {selectedPair ? `candlestick · ${TIMEFRAMES.find(t => t.value === timeframe)?.label}` : "select a pair"}
-          </span>
-          <div style={styles.liveIndicator(liveEnabled)}>
-            <span style={styles.liveDot(liveEnabled)} />
-            {liveEnabled ? "live" : "paused"}
-          </div>
-        </div>
-
-        {/* ── Toolbar rail ── */}
-        <div style={styles.toolbar}>
-          {/* Pair selector */}
-          <select
-            style={styles.pairSelect}
-            value={selectedPair}
-            onChange={e => setSelectedPair(e.target.value)}
-          >
-            <option value="">Pair…</option>
+      {/* ── Toolbar ───────────────────────────────────────────────────────────── */}
+      <div className="setup-bar" style={{ marginBottom: 12 }}>
+        {/* Pair selector */}
+        <div className="setup-group">
+          <label>Pair</label>
+          <select value={selectedPair} onChange={e => setSelectedPair(e.target.value)}>
+            <option value="">Select…</option>
             {activePairs.map(pair => (
               <option key={pair} value={pair}>{pair}</option>
             ))}
           </select>
-
-          {/* Timeframe buttons */}
-          <div style={styles.tfGroup}>
-            {TIMEFRAMES.map(tf => (
-              <button
-                key={tf.value}
-                style={styles.tfBtn(tf.value === timeframe)}
-                onClick={() => setTimeframe(tf.value)}
-              >
-                {tf.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Live toggle */}
-          <button
-            style={styles.liveBtn(liveEnabled)}
-            onClick={() => setLiveEnabled(v => !v)}
-          >
-            <span style={styles.liveDot(liveEnabled)} />
-            {liveEnabled ? "live" : "paused"}
-          </button>
         </div>
 
-        {/* ── Stats ticker ── */}
-        <div style={styles.statsTicker}>
-          {loadError ? (
-            <div style={{ ...styles.statsEmpty, color: T.bear }}>
-              ✕ {loadError}
-            </div>
-          ) : displayStats ? (
-            <>
-              {[
-                { label: "open",   value: fmt(displayStats.open)   },
-                { label: "high",   value: fmt(displayStats.high)   },
-                { label: "low",    value: fmt(displayStats.low)    },
-                { label: "close",  value: fmt(displayStats.close)  },
-                ...(displayStats.volume != null ? [{ label: "vol", value: fmt(displayStats.volume, 0) }] : []),
-                ...(displayStats.atr    != null ? [{ label: "atr(14)", value: fmt(displayStats.atr) }] : []),
-              ].map(({ label, value }) => (
-                <div key={label} style={styles.statsCell}>
-                  <span style={styles.statsCellLabel}>{label}</span>
-                  <span style={styles.statsCellValue}>{value}</span>
-                </div>
-              ))}
-
-              {changePct != null && (
-                <div style={{ ...styles.statsCell, borderRight: "none", marginLeft: "auto" }}>
-                  <span style={styles.statsCellLabel}>chg</span>
-                  <span style={{ ...styles.statsCellValue, color: changeColor }}>
-                    {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={styles.statsEmpty}>
-              {selectedPair ? "loading…" : "select a pair to begin"}
-            </div>
-          )}
-        </div>
-
-        {/* ── Main chart pane ── */}
-        <div ref={chartContainerRef} style={styles.mainPane} />
-
-        {/* ── RSI pane ── */}
-        <div style={styles.rsiWrapper}>
-          <div ref={rsiContainerRef} style={styles.rsiPane} />
-          <span style={styles.rsiLabel}>RSI 14</span>
-        </div>
-
-        {/* ── Legend ── */}
-        <div style={styles.legend}>
-          {[
-            { color: "#4A90D9", label: "SMA 20 — short trend" },
-            { color: T.accent,  label: "SMA 50 — medium trend" },
-            { color: T.bull,    label: "Bull candle / oversold(30)" },
-            { color: T.bear,    label: "Bear candle / overbought(70)" },
-            { color: T.muted,   label: "Volume (tick vol from MT5)" },
-          ].map(({ color, label }) => (
-            <div key={label} style={styles.legendItem}>
-              <span style={styles.legendDot(color)} />
-              {label}
-            </div>
+        {/* Timeframe buttons */}
+        <div className="setup-group">
+          <label>Timeframe</label>
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf.value}
+              className={tf.value === timeframe ? "btn-primary" : ""}
+              style={{ padding: "6px 12px", fontSize: 11, fontFamily: "var(--font-mono)" }}
+              onClick={() => setTimeframe(tf.value)}
+            >
+              {tf.label}
+            </button>
           ))}
         </div>
-
       </div>
-    </>
+
+      {/* ── Status row ────────────────────────────────────────────────────────── */}
+      <div className="status-row" style={{ marginBottom: 10 }}>
+        <span className={`dot ${dotClass}`} />
+        <span>{statusText}</span>
+        {hoverInfo && (
+          <span style={{ marginLeft: "auto", color: "var(--color-text-faint)" }}>
+            cursor active · hover to inspect candles
+          </span>
+        )}
+      </div>
+
+      {/* ── Stats ticker ──────────────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex",
+        alignItems: "stretch",
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 6,
+        marginBottom: 8,
+        overflow: "hidden",
+        height: 50,
+        fontFamily: "var(--font-mono)",
+      }}>
+        {loadError ? (
+          <div style={{ display: "flex", alignItems: "center", padding: "0 16px", fontSize: 11, color: "var(--color-bear)" }}>
+            ✕ {loadError}
+          </div>
+        ) : displayStats ? (
+          <>
+            {[
+              { label: "O",       value: fmt(displayStats.open),   key: "open"   },
+              { label: "H",       value: fmt(displayStats.high),   key: "high", color: "var(--color-bull)" },
+              { label: "L",       value: fmt(displayStats.low),    key: "low",  color: "var(--color-bear)" },
+              { label: "C",       value: fmt(displayStats.close),  key: "close"  },
+              ...(displayStats.volume != null ? [{ label: "VOL", value: fmt(displayStats.volume, 0), key: "vol", color: "var(--color-text-dim)" }] : []),
+              ...(displayStats.atr    != null ? [{ label: "ATR(14)", value: fmt(displayStats.atr), key: "atr", color: "var(--color-text-dim)" }] : []),
+            ].map(({ label, value, key, color }) => (
+              <div key={key} style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                padding: "0 14px",
+                borderRight: "1px solid var(--color-border)",
+              }}>
+                <span style={{
+                  fontSize: 9,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--color-text-faint)",
+                  marginBottom: 2,
+                }}>
+                  {label}
+                </span>
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: color ?? "var(--color-text)",
+                }}>
+                  {value}
+                </span>
+              </div>
+            ))}
+
+            {/* Change % — right-aligned */}
+            {changePct != null && (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                padding: "0 14px",
+                marginLeft: "auto",
+              }}>
+                <span style={{ fontSize: 9, letterSpacing: "0.12em", color: "var(--color-text-faint)", marginBottom: 2 }}>
+                  CHG
+                </span>
+                <span className={`ind-val ${changeClass}`} style={{ fontSize: 13, fontWeight: 700 }}>
+                  {changePctSign}{changePct.toFixed(2)}%
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{
+            display: "flex", alignItems: "center", padding: "0 16px",
+            fontSize: 11, color: "var(--color-text-faint)", letterSpacing: "0.06em",
+          }}>
+            {selectedPair ? "Loading data…" : "Select a pair to view price data"}
+          </div>
+        )}
+      </div>
+
+      {/* ── Main candlestick chart ─────────────────────────────────────────────── */}
+      <div
+        ref={chartContainerRef}
+        style={{
+          width: "100%",
+          height: 520,
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "6px 6px 0 0",
+          overflow: "hidden",
+        }}
+      />
+
+      {/* ── RSI sub-chart ─────────────────────────────────────────────────────── */}
+      <div style={{ position: "relative", width: "100%", marginBottom: 20 }}>
+        <div
+          ref={rsiContainerRef}
+          style={{
+            width: "100%",
+            height: 120,
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderTop: "none",
+            borderRadius: "0 0 6px 6px",
+            overflow: "hidden",
+          }}
+        />
+        {/* RSI watermark label */}
+        <span style={{
+          position: "absolute",
+          top: 6,
+          left: 8,
+          fontFamily: "var(--font-mono)",
+          fontSize: 9,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--color-text-faint)",
+          pointerEvents: "none",
+          userSelect: "none",
+        }}>
+          RSI 14 · 70/30
+        </span>
+      </div>
+
+      {/* ── Indicator legend ──────────────────────────────────────────────────── */}
+      <div className="footer-note" style={{ borderTop: "1px solid var(--color-border)", paddingTop: 16, marginTop: 0 }}>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 10 }}>
+          {[
+            { color: "#4A90D9",  label: "SMA 20"        },
+            { color: "#E0A840",  label: "SMA 50"        },
+            { color: "#3DB87C",  label: "Bull / Oversold(30)"   },
+            { color: "#E05A3A",  label: "Bear / Overbought(70)" },
+          ].map(({ color, label }) => (
+            <span key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ display: "inline-block", width: 20, height: 2, background: color, borderRadius: 1 }} />
+              <span style={{ fontSize: 11, color: "var(--color-text-faint)" }}>{label}</span>
+            </span>
+          ))}
+        </div>
+        <strong>Notes:</strong>{" "}
+        SMA crossovers may signal trend changes (lagging). RSI above 70 suggests overbought, below 30 oversold — not a timing signal.
+        ATR(14) measures volatility; useful for stops and position sizing. Volume shows tick vol from MT5.
+      </div>
+
+    </div>
   );
 }
